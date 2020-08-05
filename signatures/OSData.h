@@ -1,0 +1,18 @@
+OSData * withData(OSData *inData, unsigned int start, unsigned int numBytes);
+OSData * withData(OSData *inData);
+OSData * withCapacity(unsigned int capacity);
+OSData * withBytesNoCopy(void *bytes, unsigned int numBytes);
+OSData * withBytes(void *bytes, unsigned int numBytes);
+virtual bool appendByte(unsigned char  byte, unsigned int numBytes);
+virtual bool initWithBytes(void *bytes, unsigned int numBytes);
+virtual unsigned int getLength(void);
+virtual unsigned int getCapacityIncrement(void);
+virtual unsigned int getCapacity(void);
+virtual void * getBytesNoCopy(unsigned int start, unsigned int numBytes);
+virtual void * getBytesNoCopy(void);
+virtual unsigned int ensureCapacity(unsigned int newCapacity);
+virtual bool initWithBytesNoCopy(void *bytes, unsigned int numBytes);
+virtual bool initWithCapacity(unsigned int capacity);
+virtual bool initWithData(OSData *inData, unsigned int start, unsigned int numBytes);
+virtual bool serialize(OSSerialize *serializer);
+virtual bool appendBytes(void *bytes,  unsigned int numBytes);

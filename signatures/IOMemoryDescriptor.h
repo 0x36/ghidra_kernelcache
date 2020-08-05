@@ -1,0 +1,24 @@
+//https://developer.apple.com/documentation/kernel/iomemorydescriptor?language=objc
+IOMemoryDescriptor * withPhysicalAddress(IOPhysicalAddress address, IOByteCount withLength, IODirection withDirection);
+//IOMemoryDescriptor *(mach_vm_address_t address, mach_vm_size_t length, IOOptionBits options, task_t task);
+IOMemoryDescriptor * withOptions(void *buffers, UInt32 count, UInt32 offset, task_t task, IOOptionBits options, IOMapper *mapper);
+IOMemoryDescriptor * withAddressRanges(IOAddressRange *ranges, UInt32 rangeCount, IOOptionBits options, task_t task);
+IOMemoryDescriptor * withAddressRange(void *address,  mach_vm_size_t withLength,  IOOptionBits options,  task * task);
+IOMemoryDescriptor * withPersistentMemoryDescriptor(IOMemoryDescriptor *originalMD);
+virtual IOReturn complete(IODirection forDirection);
+virtual IOMemoryMap * createMappingInTask(task_t intoTask,  mach_vm_address_t atAddress,  IOOptionBits options,  mach_vm_size_t offset = 0,  mach_vm_size_t length = 0);
+virtual IODirection getDirection();
+virtual IOByteCount getLength();
+virtual IOReturn getPageCounts(IOByteCount *residentPageCount,  IOByteCount *dirtyPageCount);
+virtual IOPhysicalAddress getPhysicalAddress();
+virtual bool initWithOptions(void *buffers,UInt32 count, UInt32 offset, task_t task, IOOptionBits options, IOMapper *mapper = 0);
+virtual IOMemoryMap * map(IOOptionBits options = 0 );
+virtual IOReturn performOperation( IOOptionBits options,  IOByteCount offset, IOByteCount length );
+virtual IOReturn prepare(IODirection forDirection = 0);
+virtual IOByteCount readBytes(IOByteCount offset,  void *bytes, IOByteCount withLength);
+virtual IOMemoryMap * setMapping(  task_t task,  IOVirtualAddress mapAddress,  IOOptionBits options = 0 );
+virtual IOByteCount writeBytes( IOByteCount offset,  void * bytes, IOByteCount withLength);
+virtual void addMapping(IOMemoryMap *mapping);
+virtual IOReturn doMap(vm_map_t addressMap, IOVirtualAddress *atAddress, IOOptionBits options, IOByteCount sourceOffset, IOByteCount length);
+virtual IOReturn doUnmap(vm_map_t addressMap, IOVirtualAddress logical, IOByteCount length);
+virtual uint64_t getPhysicalSegment( IOByteCount offset,  IOByteCount *length,  IOOptionBits options = 0 );

@@ -1,0 +1,14 @@
+OSSerialize * binaryWithCapacity(unsigned int inCapacity, void * editor, void *reference);
+OSSerialize * withCapacity(unsigned int capacity);
+virtual char * text(void);
+virtual bool initWithCapacity(unsigned int inCapacity);
+virtual unsigned int getCapacityIncrement(void);
+virtual unsigned int getLength(void);
+virtual unsigned int getCapacity(void);
+virtual unsigned int ensureCapacity(unsigned int newCapacity);
+virtual void endBinaryCollection(uint32_t startCollection);
+virtual void clearText(void);
+virtual bool binarySerializeInternal(void *o);
+virtual bool addString(char *cString);
+virtual bool addBinaryObject(void *o, uint32_t key, void *_bits, size_t size, uint32_t *startCollection);
+virtual bool addBinary(void *data, size_t size);

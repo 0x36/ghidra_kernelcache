@@ -1,0 +1,10 @@
+OSDictionary * withObjects(void **objects,OSString **keys, unsigned int count, unsigned int capacity);
+OSDictionary * withCapacity(uint32_t capacity);
+OSDictionary * withDictionary(OSDictionary *dict, unsigned int capacity);
+virtual bool setObject(char *aKey, void *anObject);
+virtual bool setObject(OSString *aKey, void *anObject);
+virtual bool setObject(OSSymbol *aKey, void *anObject);
+virtual bool serialize(OSSerialize *serializer);
+virtual void removeObject(const char *aKey);
+virtual bool initWithObjects(OSObject **objects,OSString **keys,  unsigned int count,  unsigned int capacity = 0);
+virtual bool initWithObjects(void **objects,  OSSymbol **keys,  unsigned int count,  unsigned int capacity = 0);

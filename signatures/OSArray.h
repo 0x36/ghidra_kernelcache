@@ -1,0 +1,17 @@
+OSArray * withArray(OSArray *array, uint32_t capacity);
+OSArray * withCapacity(uint32_t capacity);
+OSArray * withObjects( OSObject **values, uint32_t count, uint32_t capacity);
+virtual bool setObject(void *anObject);
+virtual unsigned int getCapacity();
+virtual unsigned int getCount();
+virtual unsigned int getNextIndexOfObject(void *anObject,  unsigned intindex);
+virtual OSObject * getObject( unsigned intindex);
+virtual bool initWithArray(OSArray *anArray, unsigned int capacity = 0);
+virtual bool initWithCapacity( unsigned intcapacity);
+virtual bool initWithObjects(OSObject **objects,  unsigned int count,  unsigned int capacity = 0);
+virtual bool isEqualTo(void *anArray);
+virtual bool merge(OSArray *otherArray);
+virtual void removeObject( unsigned intindex);
+virtual void replaceObject(  unsigned intindex,  void *anObject);
+virtual bool serialize( OSSerialize *serializer);
+virtual unsigned int setCapacityIncrement( unsigned increment);

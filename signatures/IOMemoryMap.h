@@ -1,0 +1,11 @@
+virtual uint64_t getAddress();
+virtual task_t getAddressTask();
+virtual IOByteCount getLength();
+virtual IOOptionBits getMapOptions(); 
+virtual IOMemoryDescriptor * getMemoryDescriptor(); 
+virtual IOPhysicalAddress getPhysicalAddress(); 
+virtual uint64_t getPhysicalSegment( IOByteCount offset,  IOByteCount *length,  IOOptionBits options = 0);
+virtual IOVirtualAddress getVirtualAddress(); 
+virtual IOReturn redirect( IOMemoryDescriptor *newBackingMemory,  IOOptionBits options,  IOByteCount offset = 0);
+virtual IOReturn unmap();
+virtual IOReturn wireRange(uint32_t options, mach_vm_size_t offset, mach_vm_size_t length);
