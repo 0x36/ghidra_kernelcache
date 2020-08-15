@@ -15,8 +15,7 @@ import glob
 dtm = void = this = manager = None
 
 def getHeaderFiles():
-    #return glob.glob("/Users/mg/ghidra_ios/test_sigs/*")
-    return glob.glob("/Users/mg/ghidra_ios/signatures/*")
+    return glob.glob("/Users/mg/ghidra_kernelcache/signatures/*")
 
 def load_signatures_from_file(filename):
     funcs = open(filename,"r").read().strip().split('\n')
@@ -36,8 +35,6 @@ def load_signatures_from_file(filename):
         elif func[0:8] == "virtual ":
             vtable = True
             text = func[8:]
-            #print text
-            #raise Exception("Virtual")
 
         elif func[0:7] == "struct ":
             structName = func.split(" ")[1].replace(";","")
@@ -56,7 +53,6 @@ def load_signatures_from_file(filename):
         else:
             text = func
             
-        #text = func[1:]
         try:
             funcDef = parseSignature(service,currentProgram,text,True)
         except ghidra.app.util.cparser.C.ParseException as e:
@@ -96,10 +92,8 @@ def fix_function_signatures(namespace,fdefs):
             continue
 
         #TODO : handle multi symbols below
-        #print("[!] Multiple symbols found for %s"%(symbol))
         # a very bad workaround, but it's sufficient 
         for sym in symbols:
-            #print sym
             addr = sym.getAddress()
             
             plate =  getPlateComment(addr)
@@ -126,8 +120,6 @@ def fix_function_signatures(namespace,fdefs):
                     continue
 
             defineSymbol(sym,df)
-        #print fdef,symbols
-        #raise Exception
 
 def fix_method_definitions(namespace,fdefs):
     if namespace == "kernel":
@@ -154,7 +146,6 @@ def fix_method_definitions(namespace,fdefs):
         if dt == None:
             continue
         
-        #print "[+] Defining ",dt
         dt.setReturnType(fdef.getReturnType())
         args = fdef.getArguments()
         args.insert(0,this)
@@ -168,7 +159,6 @@ if __name__ == "__main__":
     manager = currentProgram.getSymbolTable()
     
     files = getHeaderFiles()
-    #files = ["/Users/mg/gh_projects/signatures/kernel.h"]
     for file in files:
         print ("[+] Processing %s" %(file))
         namespace = file.split(".h")[0].split("/")[-1]

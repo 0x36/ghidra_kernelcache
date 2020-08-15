@@ -119,12 +119,10 @@ def fix_externalMethods(target,selectors,sMethods):
     out_file = "/tmp/%s.json"%(className)
     with open(out_file, 'w') as json_file:
         json.dump(external_methods, json_file,indent=4, sort_keys=True)
-    #print app
     logger.info("%s file created" %(out_file))
 
 if __name__ == "__main__":
     sMethods = currentAddress
-    #sMethods = toAddr("fffffff006dbe7a0")
     if sMethods == None :
         popup("Select a The first External Method address")        
         exit(-1)

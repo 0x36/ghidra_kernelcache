@@ -1,3 +1,4 @@
+typedef u64 vm_size_t;
 int _memcmp(const void *s1, const void *s2, size_t ssize);
 void * _memcpy(void *dst, void *src, size_t ssize);
 void * _memmove(void *dst, void *src, size_t ssize);

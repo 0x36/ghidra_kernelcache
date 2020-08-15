@@ -17,15 +17,7 @@ from ghidra.app.services import ProgramManager
 
 
 src_prog_string = "kernel_leaked_symbols"
-#dst_prog_string = "kernel_iphoneX_13.4_17E5255a_10"
-dst_prog_string = "kernel_iphone7_13.5"
-dst_prog_string = "kernel_iphoneX_13.5"
-#dst_prog_string = "kernel_iphoneX_12.4_16G77"
-dst_prog_string = "kernel_iphoneXS_13.5"
-#dst_prog_string = "kernel_iphoneX_13.4_17E5255a"
-dst_prog_string = "kernel_iphone7_14.0_beta"
-dst_prog_string = "kernel_iphone7_13.6"
-#dst_prog_string = "kernel_ipad_13.4"
+dst_prog_string = "kernel_iphone7_13.5.1"
 
 def isThere(name,programDT):        
 
@@ -101,6 +93,5 @@ if __name__ == "__main__":
         struct = StructureDataType(name,0)
         dst_dtm.addDataType(struct,None)
         dst_dtm.addDataType(PointerDataType(struct),None)
-        #print name + " is not found "
         
 

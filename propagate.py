@@ -133,7 +133,6 @@ def analyze_pcode(varname,vartype, dstvar , op):
         # global namesapce is out of scope
         if hfunc == None:
             return
-        #print varname,vartype, param_index
         func = hfunc.getFunction()
 
         resolve_param(func,param_index,varname,vartype)
@@ -178,13 +177,6 @@ if __name__ == "__main__":
     cl = currentLocation
     dc = cl.getDecompile()
     addr = cl.getAddress()
-    """
-    tokenAtCursor = cl.getToken();
-    print type(tokenAtCursor)
-    print  tokenAtCursor.getPcodeOp()
-    print tokenAtCursor.getVarnode()
-    print tokenAtCursor.getHighVariable().getName(),tokenAtCursor.getHighVariable().getDataType()
-    """
     tokenAtCursor = cl.getToken();
     var = DecompilerUtils.getVarnodeRef(tokenAtCursor);
     if var == None:
