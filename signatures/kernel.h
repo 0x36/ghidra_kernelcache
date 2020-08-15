@@ -7,7 +7,7 @@ void _IOFreeAligned(void *address, vm_size_t size);
 void _IOFree(void *address, vm_size_t size);
 void * _IOLockAlloc(void);
 void _IOLockFree(void *lock);
-void _IOLockLock(IOLock *locks);
+void _IOLockLock(void *locks);
 void _bzero(void *, size_t);
 void * _IOMallocAligned(vm_size_t size, vm_offset_t alignment);
 void * _IOMalloc(vm_size_t size);

@@ -24,7 +24,6 @@ def handle_kIOUCScalarIScalarO(func,count0,count1):
         if count1 != 0:
             signature = "%s %s("
             for i in range(0,count1):
-                #for c in range(count0):
                 signature += "uint32_t *scalarOut%d, " %(i)
 
             signature = signature[:-2]
@@ -35,7 +34,6 @@ def handle_kIOUCScalarIScalarO(func,count0,count1):
     else:
         signature = "%s %s("
         for i in range(0,count0):
-            #for c in range(count0):
             if i < count0:
                 signature += "uint32_t scalar%d, " %(i)
 
@@ -45,7 +43,6 @@ def handle_kIOUCScalarIScalarO(func,count0,count1):
     
     name = func.getName()
     ret = func.getReturnType()
-    #print signature
     signature = signature %(ret.toString(),name)
 
     fdef = parseSignature(service,currentProgram,signature)
@@ -99,7 +96,6 @@ def handle_kIOUCScalarIStructO(func,count0,count1):
     name = func.getName()
     ret = func.getReturnType()
     signature = signature %(ret.toString(),name)
-    #print signature
     fdef = parseSignature(service,currentProgram,signature)
     return fdef
 
@@ -199,14 +195,11 @@ def fix_getTargetAndMethodForIndex(target,selectors,sMethods):
             ref = refMgr.addMemoryReference(func_ptr, ref_addr,
                                             RefType.COMPUTED_CALL, SourceType.DEFAULT, 0)
             setEOLComment(func_ptr,"offset=0x%x" %(off))
-            #print nss.getSymbol()
-            #raise Exception("Not handled yet")
         
         flags = getDataAt(flags_ptr).getValue()
         count0 = getDataAt(count0_ptr).getValue().getValue()
         count1 = getDataAt(count1_ptr).getValue().getValue()
         
-        #print func_ptr,func,func_addr
         if func == None:
             continue
         flags = flags.getValue() & kIOUCTypeMask
@@ -219,7 +212,6 @@ def fix_getTargetAndMethodForIndex(target,selectors,sMethods):
             fdef = handle_kIOUCStructIStructO(func,count0,count1)
         elif flags == kIOUCScalarIStructI:
             fdef = handle_kIOUCScalarIStructI(func,count0,count1)
-
         else:
             raise Exception("Unknown flag %d" %(flags))
 
@@ -243,33 +235,6 @@ if __name__ == "__main__":
     addr_str = sMethods.toString()
     target = askString("Namespace","Target name: ") # how to track the history of strings ?
     selectors = askInt("sMethod " + addr_str,"Selector count: ")
-    """
-    target="IOAccelSharedUserClient2"
-    selectors=14
-    addr_str="fffffff006e80990"
-    """
     fix_getTargetAndMethodForIndex(target,selectors,addr_str)
     
-    """
-    
-    addr_str = "fffffff006ddfe00" 
-    target = "IOSurfaceAcceleratorClient"
-    selectors = 10 
-    fix_getTargetAndMethodForIndex(target,selectors,addr_str)
-    
-    addr_str = "fffffff00576c018"
-    target = "IOPKEAcceleratorUserClient"
-    selectors = 3
-    fix_getTargetAndMethodForIndex(target,selectors,addr_str)
-
-    addr_str = "fffffff006eacb28"
-    target = "AppleJPEGDriverUserClient"
-    selectors = 7
-    fix_getTargetAndMethodForIndex(target,selectors,addr_str)
-
-    addr_str = "fffffff006e6f120"
-    target = "AppleSMCClient"
-    selectors = 3
-    fix_getTargetAndMethodForIndex(target,selectors,addr_str)
-    """
     pass
