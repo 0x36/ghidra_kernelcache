@@ -189,7 +189,7 @@ class kernelCache(object):
         else:
             class_struct = find_cs
 
-        class_struct.setPackingValue(8)
+        class_struct.setExplicitPackingValue(8)
         class_struct.add(PointerDataType(class_vtable),0,"vtable","")
         if pclass_struct == None:
             class_struct.insertAtOffset(8,class_members,classSize - 8,className+"","")
