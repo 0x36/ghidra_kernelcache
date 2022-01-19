@@ -6,4 +6,12 @@ virtual bool initWithCStringNoCopy( char *cString);
 virtual bool initWithCString( char *cString);
 virtual unsigned int getLength(void);
 virtual char * getCStringNoCopy(void);
-
+virtual bool serialize( OSSerialize *serializer);
+virtual bool isEqualTo(const OSMetaClassBase * anObject);
+virtual void free();
+virtual unsigned int getLength(void);
+virtual bool isEqualTo_1(const OSString * aString);
+virtual bool isEqualTo_2(const char * cString);
+virtual bool isEqualTo(const OSData * aDataObject);
+virtual char getChar(unsigned int index);
+virtual bool setChar(char aChar, unsigned int index);

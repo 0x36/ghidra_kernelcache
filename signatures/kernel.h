@@ -2,7 +2,7 @@ typedef u64 vm_size_t;
 int _memcmp(const void *s1, const void *s2, size_t ssize);
 void * _memcpy(void *dst, void *src, size_t ssize);
 void * _memmove(void *dst, void *src, size_t ssize);
-void * ___memcpy_chk(void *dst, void *src, size_t ssize,size_t max);
+//void * ___memcpy_chk(void *dst, void *src, size_t ssize,size_t max);
 void _IOFreeAligned(void *address, vm_size_t size);
 void _IOFree(void *address, vm_size_t size);
 void * _IOLockAlloc(void);
@@ -11,8 +11,10 @@ void _IOLockLock(void *locks);
 void _bzero(void *, size_t);
 void * _IOMallocAligned(vm_size_t size, vm_offset_t alignment);
 void * _IOMalloc(vm_size_t size);
+void * _IOMallocZero(vm_size_t size);
+void * _IOMallocData(vm_size_t size);
 void _IORecursiveLockUnlock(void *lock);
-void _IOLockUnlock(void *lock);	
+void _IOLockUnlock(void *lock);
 void _IORecursiveLockLock(void *lock);
 void _IORWLockRead(void *lock);
 void _IORWLockWrite(void *lock);
@@ -32,7 +34,6 @@ virtual IOReturn clientMemoryForType(UInt32 type, IOOptionBits *options, IOMemor
 virtual IOReturn setProperties(OSDictionary *properties );
 //virtual IOExternalMethod * getTargetAndMethodForIndex(IOService **targetP, UInt32 index)
 void * _ptmf2ptf(void *this,void *self, void *func);
-int _IORecursiveLockSleep(void *_lock, void *event, UInt32 interType);	
+int _IORecursiveLockSleep(void *_lock, void *event, UInt32 interType);
 void IORecursiveLockWakeup(void *_lock, void *event, bool oneThread);
 void * kalloc_canblock (vm_size_t * size, boolean_t canblock, void * site);
-

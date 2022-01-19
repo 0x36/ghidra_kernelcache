@@ -23,3 +23,4 @@ virtual int sleepGate(void *event, AbsoluteTime deadline, UInt32 interuptibleTyp
 virtual void threadMain(void);
 virtual bool tryCloseGate(void);
 virtual void wakeupGate(void *event, bool oneThread);
+virtual const OSMetaClass * getMetaClass();

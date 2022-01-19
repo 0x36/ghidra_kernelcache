@@ -11,52 +11,35 @@ from ghidra.app.services import ProgramManager
 
 """
 - Get all structures from source program and copy them into destination program
-- It avoids taking "_vtable" structures because fix_kernelcache will handle it 
-- If struct is already there, just skip it 
+- It avoids taking "_vtable" structures because fix_kernelcache will handle it
+- If struct is already there, just skip it
 """
 
 
-src_prog_string = "kernel_leaked_symbols"
-dst_prog_string = "kernel_iphone7_13.5.1"
+src_prog_string = "<source program>"
+dst_prog_string = "<destination program>"
 
-def isThere(name,programDT):        
+def isThere(name,programDT):
 
     if "MetaClass" in name:
         return True
 
     if "_vtable" in name:
         return True
-    
+
     dataType = programDT.getDataType(name)
-    
+
     if dataType :
         return True
 
     return False
 
-def findDataTypeByName(name):
-    tool = state.getTool()
-    service = tool.getService(DataTypeManagerService)
-    dataTypeManagers = service.getDataTypeManagers();
-    
-    for manager in dataTypeManagers:
-        
-        dataType = manager.getDataType(name)
-    
-        if dataType :
-            print "RES",name,dataType.getName()
-            return dataType
-        
-
-    return None
-
 if __name__ == "__main__":
     tool = state.getTool()
     service = tool.getService(DataTypeManagerService)
     dataTypeManagers = service.getDataTypeManagers();
-    
+
     programManager = state.getTool().getService(ProgramManager)
-    #print dir(programManager)
     progs =programManager.getAllOpenPrograms()
     if len(progs) < 2 :
         popup ("You must open at least two programs")
@@ -72,26 +55,24 @@ if __name__ == "__main__":
     if src == None or dst == None:
         popup("Could not get src/dst program")
         exit(0)
-        
+
     print src,dst
-    
+
     src_dtm = src.getDataTypeManager()
     dst_dtm = dst.getDataTypeManager()
 
     structs = src_dtm.getAllStructures()
-    
+
     for s in structs:
         name =  s.getName()
         res = isThere('/'+name,dst_dtm)
         if res == True:
             continue
-        
+
         res = isThere('/Demangler/'+name,dst_dtm)
         if res == True:
             continue
-        
+
         struct = StructureDataType(name,0)
         dst_dtm.addDataType(struct,None)
         dst_dtm.addDataType(PointerDataType(struct),None)
-        
-

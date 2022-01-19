@@ -2,10 +2,26 @@ from helpers import *
 import glob
 
 dtm = void = this = manager = None
-def defineSymbol(symbol,fdef):
+
+def convert_namespace(ns_string):
+    namespaces = {
+        "AGXAcceleratorG12" : "AGXAcceleratorG10",
+        "AGXAcceleratorG12P_B0" : "AGXAcceleratorG10P_B0",
+        "AGXAcceleratorG12P_A0" : "AGXAcceleratorG10P_A0"
+    }
+
+    if namespaces.has_key(ns_string) == False:
+        return ns_string
+
+    return namespaces[ns_string]
+
+def defineSymbol(symbol,fdef,hasNS=True):
+    print symbol
     func = getFunctionAt(symbol.getAddress())
     df = FunctionDefinitionDataType(func,False)
-    df.setGenericCallingConvention(fdef.getGenericCallingConvention())
+    if hasNS == True:
+        df.setGenericCallingConvention(fdef.getGenericCallingConvention())
+
     df.setReturnType(fdef.getReturnType())
     df.setArguments(fdef.getArguments())
     cmd = ApplyFunctionSignatureCmd(func.getEntryPoint(),df,SourceType.USER_DEFINED)
@@ -31,17 +47,20 @@ def define_label_with_namespace(addr,class_name,func_name=None):
     sym = getSymbolAt(addr)
 
     src = sym.getSource()
+
     if func_name != None:
+
         symbolTable.createLabel(addr,func_name,namespace,SourceType.USER_DEFINED)
         return
-    
+
 
     if src != SourceType.USER_DEFINED:
         symName = "FN_"+sym.getName().split("FUN_")[1]
         symbolTable.createLabel(addr,symName,namespace,SourceType.USER_DEFINED)
 
     # if we want to update the namespace
-    if src == SourceType.USER_DEFINED and "FN_" in sym.getName():
+    if src == SourceType.USER_DEFINED and "FN_" in sym.getName() :
+        #print "yes"
         symName = sym.getName()
 
         func = getFunctionAt(sym.getAddress())
@@ -50,10 +69,10 @@ def define_label_with_namespace(addr,class_name,func_name=None):
         #sym.setParentNamespace(namespace)
         #symName = "FN_" + func.getName().split("FUN_")[1]
         symbolTable.createLabel(addr,symName,namespace,SourceType.USER_DEFINED)
-        
+
 def _fix_method(func,class_struct):
     #try:
-        
+
     func.setCustomVariableStorage(True)
     params = func.getParameters()
     newParm =  ParameterImpl("this",PointerDataType(class_struct),currentProgram)
@@ -64,12 +83,12 @@ def _fix_method(func,class_struct):
         HighFunctionDBUtil.commitParamsToDatabase(hfunc,True,SourceType.USER_DEFINED)
         params = func.getParameters()
         #assert(len(params) != 0)
-        
+
     if len(params) > 0:
         params[0] = newParm
     else:
-        # a small workaround is by giving the user the choice to manually add 
-        # the parameters 
+        # a small workaround is by giving the user the choice to manually add
+        # the parameters
         #print "FUNCTION ", func , "params" , len(params)
         #paramsCount = askInt("I couldn't get the params","Put parameter count:")
         #print paramsCount
@@ -86,22 +105,22 @@ def _fix_method(func,class_struct):
             True,
             SourceType.ANALYSIS,
             params)
-        
+
     #except Exception as e:
     #    print "[-] Function is invalid" ,e
     #    raise Exception(e)
-        
+
 def fix_method(addr,class_name):
     dtm = currentProgram.getDataTypeManager()
     class_struct = find_struct(class_name)
     if class_struct == None:
         popup( "Class struct %s not found" %(class_name))
         return
-    
+
     func = getFunctionAt(addr)
-    
+
     _fix_method(func,class_struct)
-    
+
     func.setCallingConvention("__thiscall")
 
 def fix_func_namespace(className,FuncName):
@@ -113,7 +132,7 @@ def fix_func_namespace(className,FuncName):
     f = FuncName.split(dlm)[1]
     define_label_with_namespace(f,className)
     fix_method(f,className)
-    
+
 def fix_method_definitions(namespace,fdefs):
     if namespace == "kernel":
         for fdef in fdefs:
@@ -128,9 +147,9 @@ def fix_method_definitions(namespace,fdefs):
                 args = fdef.getArguments()
                 args.insert(0,this)
                 dt.setArguments(args)
-                
+
         return
-    
+
     for fdef in fdefs:
         name = fdef.getName()
         full_name = namespace + '::'+ name
@@ -151,16 +170,16 @@ def makeFunction(function_ptr):
         if PTR == None:
             addTypeDef("pointer","pointer64")
             PTR = currentProgram.getDataTypeManager().getDataType("/pointer")
-            
+
         currentProgram.getListing().createData(function_ptr, PTR)
 
     # label address value
     label = getDataAt(function_ptr).getValue()
     if label.getOffset() == 0:
         return
-    
+
     func = getFunctionAt(label)
-    
+
     if func == None:
         # the function is not defined as a function"
         if fixLabel(label) == -1:
@@ -176,9 +195,9 @@ def fix_namespace(className,function,func_name=None):
         #funcs.pop()
     elif "extMethod" in function_string:
         dlm = "extMethod"
-        
+
     #f = function_string.split(dlm)[1]
-    #print function
+
     func_addr = function.getEntryPoint()
     define_label_with_namespace(func_addr,className,func_name)
     fix_method(func_addr,className)
@@ -193,7 +212,7 @@ def load_signatures_from_file(filename):
     service = tool.getService(DataTypeManagerService)
     dtm = currentProgram.getDataTypeManager()
     funcDefs = []
-    
+
     for func in funcs:
         vtable = False
         if len(func) == 0:
@@ -202,14 +221,14 @@ def load_signatures_from_file(filename):
             continue
         if func[0] == "-":
             vtable = True
-        
+
         text = func[1:]
         funcDef = parseSignature(service,currentProgram,text)
         if vtable == True:
             funcDef.setGenericCallingConvention(GenericCallingConvention.thiscall)
 
         funcDefs.append(funcDef)
-    
+
     return funcDefs
 
 # this fixes directly the function signature of a given function
@@ -222,9 +241,9 @@ def fix_function_signatures(namespace,fdefs):
             for s in symbols:
                 defineSymbol(s,fdef)
             #continue
-        
+
         ns = manager.getNamespace(namespace,None)
-        # get symbol only for that namespace 
+        # get symbol only for that namespace
         symbols = manager.getSymbols(symbol,ns)
         if len(symbols) == 0 or ns == None:
             #print(" [-] Symbol/Namespace not found for %s "% (fdef.getName()) , ns)
@@ -246,7 +265,7 @@ def load_signatures():
     void = currentProgram.getDataTypeManager().findDataType("/void")
     this = ParameterDefinitionImpl("this",PointerDataType(void),"")
     manager = currentProgram.getSymbolTable()
-    
+
     files = getHeaderFiles()
     #files = ["/Users/mg/gh_projects/signatures/kernel.h"]
     for file in files:

@@ -18,8 +18,8 @@ def fix_extMethod(class_struct ,func):
     dtm = currentProgram.getDataTypeManager()
     IOArgs_dt = find_struct("IOExternalMethodArguments")
     assert(IOArgs_dt != None)
-    
-    
+
+
     this =  ParameterImpl("this",PointerDataType(class_struct),currentProgram)
     reference = ParameterImpl("reference",PointerDataType(VoidDataType()),currentProgram)
     IOArgs = ParameterImpl("args",PointerDataType(IOArgs_dt),currentProgram)
@@ -35,20 +35,20 @@ IOExternalMethodDispatch_size = 24
 
 external_methods = {}
 def fix_externalMethods(target,selectors,sMethods):
-    
+
     logger.info("target=%s selectors=%d ,sMethod=%s" %(target,selectors, sMethods))
     _sMethods = sMethods
     className = target
-    symbolTable = currentProgram.getSymbolTable() 
+    symbolTable = currentProgram.getSymbolTable()
     listing =  currentProgram.getListing()
-    
+
     namespace = symbolTable.getNamespace(className,None)
 
     if namespace == None:
         popup("[-] %s class not found  " %(className))
         exit(-1)
     class_struct = find_struct(className)
-    
+
     em_infos = {}
     for sel in range(selectors):
         #off = sel * 24
@@ -57,30 +57,27 @@ def fix_externalMethods(target,selectors,sMethods):
         checkStructureInputSize_off     = checkScalarInputCount_off + 4
         checkScalarOutputCount_off      = checkStructureInputSize_off + 4
         checkStructureOutputSize_off    = checkScalarOutputCount_off +4
-        
+
         smAddr = toAddr(sMethods)
-        
+
         function_ptr = toAddr(hex(function_off).replace("L",""))
         function_end = toAddr(hex(function_off+25).replace("L",""))
-        
+
         scalarInput_addr = toAddr(hex(checkScalarInputCount_off).replace("L",""))
         structureInput_addr = toAddr(hex(checkStructureInputSize_off).replace("L",""))
         scalarOutput_addr = toAddr(hex(checkScalarOutputCount_off).replace("L",""))
         structureOutput_addr = toAddr(hex(checkStructureOutputSize_off).replace("L",""))
-                
+
         listing.clearCodeUnits(function_ptr,function_end,False)
 
-        func = makeFunction(function_ptr) # make function
+        func = makeFunction(function_ptr)
         func_addr = getDataAt(function_ptr).getValue()
-        
+
         func = getFunctionAt(func_addr)
         if func != None:
             symName = "extMethod_%d" %(sel)
             fix_namespace(className,func,symName)
             fix_extMethod(class_struct,func)
-
-            #if func.getSymbol().getSource() != SourceType.USER_DEFINED:
-            #func.setName(symName,SourceType.USER_DEFINED)
 
         setEOLComment(function_ptr,"sel %d" %(sel))
         makeUint(scalarInput_addr,"scalarInput")
@@ -94,11 +91,10 @@ def fix_externalMethods(target,selectors,sMethods):
         structureInputCnt = getDataAt(structureInput_addr).getValue()
         scalarOutputCnt = getDataAt(scalarOutput_addr).getValue()
         structureOutputCnt = getDataAt(structureOutput_addr).getValue()
-        
-        #print "SCALAR COUNT", scalarInputCnt
-        #print "SCALAR COUNT", structureInputCnt
-        #print "SCALAR COUNT", scalarOutputCnt
-        #print "SCALAR COUNT", structureOutputCnt
+
+        if func == None:
+            continue
+
         function_name = func.getName(False)
         call_info = {
             "selector"              :   sel,
@@ -109,12 +105,14 @@ def fix_externalMethods(target,selectors,sMethods):
             "async"                 :   False,
             "address": func_addr.toString()
             }
-        
+
+        if function_name in em_infos:
+            function_name = function_name + str(sel)
         em_infos[function_name] = call_info
-    
-    external_methods['externalMethods'] =  em_infos # externalMethods
-    external_methods['target'] =  className    # userclient
-    external_methods['user_client_type'] =  0      # connection type (-1 means undefiend)
+
+    external_methods['externalMethods'] =  em_infos     # externalMethods
+    external_methods['target'] =  className             # userclient
+    external_methods['user_client_type'] =  0           # connection type (-1 means undefiend)
     external_methods['sMethods'] =  _sMethods
     out_file = "/tmp/%s.json"%(className)
     with open(out_file, 'w') as json_file:
@@ -124,12 +122,12 @@ def fix_externalMethods(target,selectors,sMethods):
 if __name__ == "__main__":
     sMethods = currentAddress
     if sMethods == None :
-        popup("Select a The first External Method address")        
+        popup("Select a The first External Method address")
         exit(-1)
 
     logger = setup_logging("external_method")
     addr_str = sMethods.toString()
     target = askString("Namespace","Target name: ") # how to track the history of strings ?
     selectors = askInt("sMethod " + addr_str,"Selector count: ")
-    
+
     fix_externalMethods(target,selectors,addr_str)

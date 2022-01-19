@@ -18,5 +18,3 @@ from utils.references import *
 
 if __name__ == "__main__":
     fix_extra_refs(currentAddress)
-    
-    

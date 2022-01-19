@@ -1,12 +1,6 @@
 #@category iOS.kernel
 #@toolbar logos/sign.png
 #@keybinding Meta Shift S
-'''
-The script parses function definition from text file 
-it fixes the function signature of given function if exists
-it fixes function definition if it is identified as vtable 
-
-'''
 
 from utils.helpers import *
 from utils.methods import *
@@ -24,14 +18,13 @@ def load_signatures_from_file(filename):
     dtm = currentProgram.getDataTypeManager()
     funcDefs = []
     text = ""
-    
+
     for func in funcs:
         vtable = False
         if len(func) == 0:
             continue
         elif func[0:2] == "//":
             continue
-        #if func[0] == "-":
         elif func[0:8] == "virtual ":
             vtable = True
             text = func[8:]
@@ -52,18 +45,18 @@ def load_signatures_from_file(filename):
 
         else:
             text = func
-            
+
         try:
             funcDef = parseSignature(service,currentProgram,text,True)
         except ghidra.app.util.cparser.C.ParseException as e:
             print e
             raise Exception("Failed to parse the signature")
-        
+
         if vtable == True:
             funcDef.setGenericCallingConvention(GenericCallingConvention.thiscall)
 
         funcDefs.append(funcDef)
-    
+
     return funcDefs
 
 # this fixes directly the function signature of a given function
@@ -77,13 +70,10 @@ def fix_function_signatures(namespace,fdefs):
             symbols = manager.getSymbols(symbol)
             for s in symbols:
                 defineSymbol(s,fdef)
-            #continue
-        
+
         ns = manager.getNamespace(namespace,None)
-        # get symbol only for that namespace 
         symbols = manager.getSymbols(symbol,ns)
         if len(symbols) == 0 or ns == None:
-            #print(" [-] Symbol/Namespace not found for %s "% (fdef.getName()) , ns)
             continue
         if symbols == None:
             continue
@@ -92,10 +82,10 @@ def fix_function_signatures(namespace,fdefs):
             continue
 
         #TODO : handle multi symbols below
-        # a very bad workaround, but it's sufficient 
+        # a very bad workaround, but it's sufficient
         for sym in symbols:
             addr = sym.getAddress()
-            
+
             plate =  getPlateComment(addr)
             if plate == None:
                 continue
@@ -128,36 +118,35 @@ def fix_method_definitions(namespace,fdefs):
             symbols = manager.getSymbols(name)
             for symbol in symbols:
                 full_name =  symbol.getName(True)
-                dt = find_funcdef(full_name) #dtm.getDataType("/functions/"+full_name)
+                dt = find_funcdef(full_name)
                 if dt == None:
                     continue
                 dt.setReturnType(fdef.getReturnType())
                 args = fdef.getArguments()
                 args.insert(0,this)
                 dt.setArguments(args)
-                
+
         return
-    
+
     for fdef in fdefs:
         name = fdef.getName()
         full_name = namespace + '::'+ name
-        dt = find_funcdef(full_name) #dtm.getDataType("/functions/"+full_name)
-        # probably it's not a virtual function, alright
+        dt = find_funcdef(full_name)
         if dt == None:
             continue
-        
+
         dt.setReturnType(fdef.getReturnType())
         args = fdef.getArguments()
         args.insert(0,this)
         dt.setArguments(args)
-        
+
 if __name__ == "__main__":
     DeclareDataTypes()
     dtm = currentProgram.getDataTypeManager()
     void = currentProgram.getDataTypeManager().findDataType("/void")
     this = ParameterDefinitionImpl("this",PointerDataType(void),"")
     manager = currentProgram.getSymbolTable()
-    
+
     files = getHeaderFiles()
     for file in files:
         print ("[+] Processing %s" %(file))

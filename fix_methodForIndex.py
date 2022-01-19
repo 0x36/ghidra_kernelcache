@@ -27,7 +27,6 @@ def handle_kIOUCScalarIScalarO(func,count0,count1):
                 signature += "uint32_t *scalarOut%d, " %(i)
 
             signature = signature[:-2]
-
             signature+= ")"
         else:
             signature = "%s %s(void)"
@@ -38,9 +37,9 @@ def handle_kIOUCScalarIScalarO(func,count0,count1):
                 signature += "uint32_t scalar%d, " %(i)
 
         signature = signature[:-2]
-                
+
         signature+= ")"
-    
+
     name = func.getName()
     ret = func.getReturnType()
     signature = signature %(ret.toString(),name)
@@ -61,18 +60,18 @@ def handle_kIOUCStructIStructO(func,count0,count1):
             signature = "%s %s(char *input,char *output,uint64_t inputCnt,uint64_t *outputCnt)"
         else:
             signature = "%s %s(char *output,uint64_t *outputCnt)"
-    
+
     else:
         signature = "%s %s(char *input,uint64_t inputCnt)"
 
     name = func.getName()
     ret = func.getReturnType()
     signature = signature %(ret.toString(),name)
-    
+
     #print signature
     fdef = parseSignature(service,currentProgram,signature)
     return fdef
-    
+
 
 def handle_kIOUCScalarIStructO(func,count0,count1):
     logger.debug("kIOUCScalarIStructO func=%s, count0=%d, count1=%d" %(func.getName(),count0,count1))
@@ -80,7 +79,7 @@ def handle_kIOUCScalarIStructO(func,count0,count1):
     service = tool.getService(DataTypeManagerService)
 
     signature = ""
-    
+
     if count0 == 0:
         if count1 != 0:
             signature = "%s %s(char *output,uint32_t *outputCnt)"
@@ -106,7 +105,7 @@ def handle_kIOUCScalarIStructI(func,count0,count1):
     service = tool.getService(DataTypeManagerService)
 
     signature = ""
-    
+
     if count0 == 0:
         if count1 != 0:
             signature = "%s %s(char *input,uint32_t inputCnt)"
@@ -125,7 +124,7 @@ def handle_kIOUCScalarIStructI(func,count0,count1):
     fdef = parseSignature(service,currentProgram,signature)
 
     return fdef
-    
+
 
 def fix_getTargetAndMethodForIndex(target,selectors,sMethods):
     logger.info("target=%s selectors=%d ,sMethod=%s" %(target,selectors, sMethods))
@@ -146,7 +145,7 @@ def fix_getTargetAndMethodForIndex(target,selectors,sMethods):
         kIOUCScalarIStructO : "kIOUCScalarIStructO",
         kIOUCStructIStructO : "kIOUCStructIStructO",
         kIOUCScalarIStructI : "kIOUCScalarIStructI"
-        }
+    }
 
     namespace = symbolTable.getNamespace(target,None)
     addr = toAddr(sMethods)
@@ -167,7 +166,7 @@ def fix_getTargetAndMethodForIndex(target,selectors,sMethods):
         makeULongLong(count0_ptr,"count0")
         makeULongLong(count1_ptr,"count1")
 
- 
+
         setEOLComment(object_ptr,"sel %d" %(sel))
         isOffset = getDataAt(off_ptr).getValue().getValue()
 
@@ -175,7 +174,7 @@ def fix_getTargetAndMethodForIndex(target,selectors,sMethods):
             func = makeFunction(func_ptr)
             func_addr = getDataAt(func_ptr).getValue()
             func = getFunctionAt(func_addr)
-            
+
         else:
             # function referenced as offset
             listing.clearCodeUnits(func_ptr,func_ptr,False,monitor)
@@ -191,15 +190,15 @@ def fix_getTargetAndMethodForIndex(target,selectors,sMethods):
             ref_addr = getDataAt(ptr).getValue()
 
             func = getFunctionAt(ref_addr)
-            
+
             ref = refMgr.addMemoryReference(func_ptr, ref_addr,
                                             RefType.COMPUTED_CALL, SourceType.DEFAULT, 0)
             setEOLComment(func_ptr,"offset=0x%x" %(off))
-        
+
         flags = getDataAt(flags_ptr).getValue()
         count0 = getDataAt(count0_ptr).getValue().getValue()
         count1 = getDataAt(count1_ptr).getValue().getValue()
-        
+
         if func == None:
             continue
         flags = flags.getValue() & kIOUCTypeMask
@@ -218,7 +217,7 @@ def fix_getTargetAndMethodForIndex(target,selectors,sMethods):
         setEOLComment(flags_ptr,d[flags])
         if "FUN_" in func.getName() or "FN_" in func.getName():
             func.setName("extMethod_%d" %(sel),SourceType.USER_DEFINED)
-            
+
         func.setParentNamespace(namespace)
         cmd = ApplyFunctionSignatureCmd(func.getEntryPoint(),fdef,SourceType.USER_DEFINED)
         cmd.applyTo(func.getProgram())
@@ -227,14 +226,14 @@ def fix_getTargetAndMethodForIndex(target,selectors,sMethods):
 if __name__ == "__main__":
     sMethods = currentAddress
     if sMethods == None :
-        popup("Select a The first External Method address")        
+        popup("Select a The first External Method address")
         exit(-1)
 
     logger = setup_logging("getTargetAndMethodForIndex")
-    
+
     addr_str = sMethods.toString()
     target = askString("Namespace","Target name: ") # how to track the history of strings ?
     selectors = askInt("sMethod " + addr_str,"Selector count: ")
     fix_getTargetAndMethodForIndex(target,selectors,addr_str)
-    
+
     pass

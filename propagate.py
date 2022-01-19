@@ -1,219 +1,277 @@
+# Propagate variable symbol + type over a function
 #@author simo
 #@category iOS.kernel
-#@keybinding Meta Shift P
+#@keybinding Alt X
 #@menupath
-#@toolbar logos/p_logo.png
+#@toolbar logos/sdsdlogo.png
 #@description propagate the new symbol name/type across function arguments
 # -*- coding: utf-8 -*-
 
-from ghidra.app.script import GhidraScript,GhidraState
-from ghidra.program.model.data import FunctionDefinition
-from ghidra.app.util.demangler import Demangler
-from ghidra.app.cmd.label import DemanglerCmd
-from ghidra.program.model.data import IntegerDataType,VoidDataType,StructureDataType,UnsignedLongLongDataType,PointerDataType,FunctionDefinitionDataType
-from ghidra.program.model.data import FunctionDefinitionDataType
-from ghidra.program.model.listing import Parameter,ParameterImpl,Program
-from ghidra.program.model.symbol import SourceType,SymbolTable,Namespace,RefType
-from ghidra.program.util.GhidraProgramUtilities import getCurrentProgram
-from  ghidra.app.services import DataTypeManagerService
-from ghidra.app.decompiler import DecompileOptions,DecompInterface,DecompilerLocation
-from  ghidra.app.decompiler.component import DecompilerUtils
-from ghidra.framework.plugintool.util import OptionsService
-from ghidra.program.model.pcode import PcodeOp,HighFunctionDBUtil
-from ghidra.program.model.listing.Function import FunctionUpdateType
-import logging
-import os,sys
+# interesting link : https://github.com/NationalSecurityAgency/ghidra/issues/2236#issuecomment-685204563
+from utils.helpers import *
+from ghidra.app.decompiler.component import DecompilerUtils
+from ghidra.app.decompiler import ClangVariableToken,ClangFieldToken
+from ghidra.program.database.data import StructureDB
+#from ghidra.app.decompiler import ClangToken as clang
+"""
+ClangOpToken: ex return, if , else ..etc
+ClangSyntaxToken : {} ()
+ClangFuncNameToken : a function call
+"""
 
-logger = []
-ifc = None
-def init_logger(name):
-    log = logging.getLogger(name)
-    log.setLevel(logging.DEBUG)
-    
-    ch = logging.StreamHandler()
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s: %(message)s')
-    ch.setFormatter(formatter)
-    
-    log.addHandler(ch)
+datatypes = {}
 
-    return log
+def setup_datatypes():
+    global datatypes
+    dtm = currentProgram.getDataTypeManager()
+    uchar = dtm.getDataType("/uchar")
+    ushort = dtm.getDataType("/ushort")
+    uint = dtm.getDataType("/uint")
+    ulonglong = dtm.getDataType("/ulonglong")
 
-def _decompiler():
-    ifc = DecompInterface()
-    DecOptions = DecompileOptions()
-    service = state.getTool().getService(OptionsService)
+    datatypes[1] = uchar
+    datatypes[2] = ushort
+    datatypes[4] = uint
+    datatypes[8] = ulonglong
+    assert (uchar and ushort and uint and ulonglong)
+    #exit(0)
+structure = None
 
-    opt = service.getOptions("Decompiler")
-    DecOptions.grabFromToolAndProgram(None, opt, currentProgram)
-    ifc.setOptions(DecOptions)
 
-    ifc.toggleCCode(True)
-    ifc.toggleSyntaxTree(True)
-    ifc.setSimplificationStyle("decompile")
+def validate_token_store(token):
+    """
+    Checks the source target token
+    Support : STORE , (LOAD later)
+    """
+    # the token must be a variable and has an operation code
+    if token.isVariableRef() == False or token.getPcodeOp() == None:
+        return False
 
-    ifc.openProgram(currentProgram)
-    return ifc
+    op = token.getPcodeOp()
+    if op.getOpcode() != PcodeOp.STORE:
+        return False
+    return True
 
-def decompile_func(ifc,func):
-    res = ifc.decompileFunction(func,ifc.options.defaultTimeout,monitor)
-    if not res.decompileCompleted():
-        print res.getErrorMessage()
-        raise Exception("Decompilation is not completed")
+def get_struct_fild(struct,fields):
+    pass
 
-    hfunc = res.getHighFunction()
-    if hfunc == None:
-        raise Exception("Cannot get HighFunction")
-    return hfunc
-
-def get_caller_op(addr):
-    inst = currentProgram.getListing().getInstructionAt(addr)
-
-    for i in range(100):
-        addr = inst.getAddress()
-
-        ops = dc.getHighFunction().getPcodeOps(addr)
-
-        for op in ops:
-            if op.opcode == PcodeOp.CALLIND:
-                return op
-
-            elif op.opcode == PcodeOp.CALL:
-                return op
-
-        inst = inst.getNext()
-
-#get high function from varnode
-def get_function(caller):
-    
-    func_addr = caller.getAddress()
-    func = getFunctionAt(func_addr)
-
-    # we want to deal only with functions with a namespace
-    if func.getParentNamespace().isGlobal() == True:
-        return None
-        
-    hfunc = decompile_func(ifc,func)
-    HighFunctionDBUtil.commitParamsToDatabase(hfunc,True,SourceType.USER_DEFINED)
-        
-    return hfunc
-
-def get_input_index(op,var):
-    index = -1
-    inputs = op.getInputs()
-    for i,input in enumerate(inputs):
-        if input == var:
-            index = i
-            break
-    index = index -1
-    return index
-
-def resolve_param(func,param_index,varname,vartype):
-    params = func.getParameters()
-    if len(params) < param_index:
-        raise Exception("Function params are intact")
-    
-    print "[+] '%s' is used in %s in parameter index %d" %(varname,func.getName(True),param_index)
-    target_param = params[param_index]
-    target_param.setName(varname,SourceType.USER_DEFINED)
-    target_param.setDataType(vartype,SourceType.USER_DEFINED)
-    
-def analyze_pcode(varname,vartype, dstvar , op):
-
-    param_index = -1
-    if op.opcode == PcodeOp.CALL:
+# returns (datatype,size) of the variable token
+def handle_source_token(token):
+    op = token.getPcodeOp()
+    if (op.getOpcode() == PcodeOp.STORE):
         inputs = op.getInputs()
-        caller = inputs[0]
+        dst,src = inputs[1], inputs[2]
+        #print op
 
+        if src.isConstant():
+            size = src.getSize()
+            dt = None
+        elif src.isRegister() or src.isUnique():
+            size = src.getSize()
+            high = src.getHigh()
 
-        param_index = get_input_index(op,dstvar)
-        if param_index == -1:
-            raise Exception("target param not found ")
-        
-        hfunc = get_function(caller)
-        # global namesapce is out of scope
-        if hfunc == None:
+            if (isinstance(high,ghidra.program.model.pcode.HighOther) == True):
+                high = None
+                return (None,size)
+            dt = high.getDataType()
+
+        # elif src.isUnique():
+        #     print "UNIQ"
+        #     size = src.getSize()
+        #     high = src.getHigh()
+        #     print size,high
+        #     raise Exception
+        else:
+            print("hndle_source_token(): varnode type not supported [IGNORE] ")
+            return (None,src.getSize())
+
+    return (dt,size)
+
+#returns the target variable to be modified
+def handle_dest_vartoken(line,src_dt,src_size):
+    var = None
+    fields = []
+    for tok in line.getAllTokens():
+        if tok.toString() == "=":
+            break
+
+        if(isinstance(tok,ClangVariableToken) == True):
+            if var != None:
+                continue
+            sym = tok.getHighVariable().getSymbol()
+            if sym: var = tok
+
+        elif(isinstance(tok,ClangFieldToken) == True):
+            fields.append(tok)
+    # now we have "this [IOBluetoothDeviceUserClient, field_0x10]"
+    #if isinstance(this)
+    var_dt =  var.getHighVariable().getSymbol().getDataType()
+    path = var_dt.getDataTypePath()
+    mgr = var_dt.getDataTypeManager()
+    n =  var_dt.getName().replace("*","").strip()
+    st = find_struct(n)
+    if (st == None):
+        raise Exception("Could not find %s structure"% n)
+    #var_name =
+    # fields tokens are taken recursively : dt->field1.field2. .. .fieldN
+    if (isinstance(st,StructureDB) == False):
+        return None
+
+    cps = st.getComponents()
+    struct =  st
+    if cps == None:
+        return None
+    for field in fields:
+        cps = struct.getComponents()
+        if cps == None:
+            break
+        fld_name = field.toString()
+        # if we hit "field_name", it does mean the field member is still undefined
+        # and we reach the end of the structure parsing
+        if "field_" in fld_name:
+            try:
+                f,idx = fld_name.split("_")
+            except ValueError:
+                f,idx,_ = fld_name.split("_")
+            target = struct.getDataTypeAt(int(idx,16))
+            fld_name = f + "_" + str(idx)
+            try:
+                if src_dt: dt = src_dt
+                else: dt = datatypes[src_size]
+                struct.replaceAtOffset(int(idx,16),dt,src_size,fld_name+"_","")
+
+            # sometimes the variable is not aligned and is conflicting with other struct member
+            # must be handled manually
+            except java.lang.IllegalArgumentException as e:
+                print (e)
+            break
+
+        for cp in cps:
+            if cp.getFieldName() == fld_name:
+                if(isinstance(cp.getDataType(),StructureDB)):
+                    struct = cp.getDataType()
+                break
+
+# token: is the source target token
+def handle_line_store(line,token):
+    global structure
+    src_dt, src_sz = handle_source_token(token)
+    handle_dest_vartoken(line,src_dt,src_sz)
+    """
+    op = token.getPcodeOp()
+    assert(op.getOpcode() == PcodeOp.STORE)
+    inputs = op.getInputs()
+    dst,src = inputs[1], inputs[2]
+
+    if src.isConstant() == False:
+        sym = src.getHigh().getSymbol()
+        if (sym == None):
             return
-        func = hfunc.getFunction()
+        dt = sym.getDataType()
+        print dt.getLength()
+        print("Unable to handle no constant values")
+        exit(0)
+        return
+    """
+    return
 
-        resolve_param(func,param_index,varname,vartype)
-    elif op.opcode == PcodeOp.CALLIND:
-        # get memory reference
-        pc = op.getSeqnum().getTarget()
-        refMgr = currentProgram.getReferenceManager()
-        refs = refMgr.getReferencesFrom(pc,0)
-        if len(refs) == 0:
-            raise Exception()
-            return 
+    # now get variableRef
+    var  = None
+    var_name = None
+    fields = []
+    f_done = True
 
-        # take care for one ref atm
-        ref  = refs.pop()
-        addr = ref.getToAddress()
-        
-        # get function from that address
-        func = getFunctionAt(addr)
-        hfunc = decompile_func(ifc,func)
-        HighFunctionDBUtil.commitParamsToDatabase(hfunc,True,SourceType.USER_DEFINED)
+    for t in line.getAllTokens():
+        #print t,type(t)
+        if(isinstance(t,ClangVariableToken) == True):
+            if var != None:
+                continue
+            sym = t.getHighVariable().getSymbol()
+            if sym: var = t
 
-        # get the input index from the operation varnode
-        param_index = get_input_index(op,dstvar)
-        if param_index == -1:
-            raise Exception("target param not found ")
+        elif(isinstance(t,ClangFieldToken) == True):
+            fields.append(t)
 
-        
+        if t == token:
+            print "We are done"
+            break
 
-        # get parameter index from the resolved function
-        # change its name/type
-        resolve_param(func,param_index,varname,vartype)
+    var_dt = var.getHighVariable().getSymbol().getDataType()
+    path = var_dt.getDataTypePath()
+    mgr = var_dt.getDataTypeManager()
+    n =  var_dt.getName().replace("*","").strip()
+    st = find_struct(n)
+    if (st == None):
+        raise Exception("Could not find %s structure"% n)
+
+    # fields tokens are taken recursively : dt->field1.field2...fieldn
+    cps = st.getComponents()
+    struct =  st
+    if cps == None:
+        return
+    for field in fields:
+        cps = struct.getComponents()
+        if cps == None:
+            break
+        fld_name = field.toString()
+        # if we hit "field_name", it does mean the field member is still undefined
+        # and we reach the end of the structure parsing
+        if "field_" in fld_name:
+            f,idx = fld_name.split("_")
+            #print f,idx
+            target = struct.getDataTypeAt(int(idx,16))
+            #target.setFieldName("f_"+idx)
+            try:
+                struct.replaceAtOffset(int(idx,16),datatypes[target_size],target_size,"f_"+idx,"")
+            except java.lang.IllegalArgumentException as e:
+                print (e)
+            break
+        for cp in cps:
+            if cp.getFieldName() == fld_name:
+                if(isinstance(cp.getDataType(),StructureDB)):
+                    struct = cp.getDataType()
+                break
+
+def debug_line(lines,linum):
+    for line in lines:
+        if line.getLineNumber() != linum:
+            continue
+
+        print (line)
+        tokens = line.getAllTokens()
+        for token in tokens:
+            print token, type(token),"opcode :", token.getPcodeOp()
+
+
+
+def handle_line(line):
+    tokens = line.getAllTokens()
+    for token in tokens:
+        if validate_token_store(token) == True:
+            handle_line_store(line,token)
+            pass
+        else: # handle other opcodes here
+            pass
+
+def do_assign(addr):
+    entry = addr
+    setup_datatypes()
+    print(entry)
+    func = getFunctionContaining(entry)
+    assert(func != None)
+    print func
+    decompInterface = DecompInterface()
+    decompInterface.openProgram(currentProgram)
+    decompiled =  decompInterface.decompileFunction(func, 120, monitor)
+
+    lines = DecompilerUtils.toLines(decompiled.getCCodeMarkup())
+
+    for line in lines:
+        handle_line(line)
+
+    decompInterface.dispose()
+    print("Done")
 
 if __name__ == "__main__":
-    logger = init_logger("propagator")
-    ifc = _decompiler()
-    
-    if isinstance(currentLocation,DecompilerLocation) == False:
-        logger.error("Put the cursor in the decompiler window")
-        raise Exception
-    
-
-    cl = currentLocation
-    dc = cl.getDecompile()
-    addr = cl.getAddress()
-    tokenAtCursor = cl.getToken();
-    var = DecompilerUtils.getVarnodeRef(tokenAtCursor);
-    if var == None:
-        print "[-] Cannot get the varnode "
-        raise Exception("Varnode error")
-    
-    desc = var.getDescendants()
-
-    varhigh = var.getHigh()
-
-    if varhigh == None:
-        raise Exception("Could not get High variable")
-
-    varname = varhigh.getName()
-    vartype = varhigh.getDataType()
-    if varname == None or vartype == None:
-        raise Exception("No name/type found ")
-    print varname,vartype
-
-    for op in desc :
-        if op.opcode == PcodeOp.CALL or op.opcode == PcodeOp.CALLIND:
-            analyze_pcode(varname,vartype,var,op)
-
-        elif op.opcode == PcodeOp.CAST:
-            varref = op.getOutput()#.getDef()
-            newops = varref.getDescendants()
-            for newop in newops:
-                print "Cast Operation ",newop
-                analyze_pcode(varname,vartype,varref,newop)
-        elif op.opcode == PcodeOp.SUBPIECE:
-            pass
-        elif op.opcode == PcodeOp.INT_ZEXT:
-            varref = op.getOutput()
-            newops = varref.getDescendants()
-            for newop in newops:
-                analyze_pcode(varname,vartype,varref,newop)
-        else:
-            print "Unhandled op"
-            
-        print "*" * 100
+    listing = currentProgram.getListing()
+    do_assign(currentAddress)

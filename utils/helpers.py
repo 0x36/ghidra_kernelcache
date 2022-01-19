@@ -13,9 +13,59 @@ from ghidra.framework.plugintool.util import OptionsService
 from ghidra.program.model.listing.Function import FunctionUpdateType
 from ghidra.program.model.pcode import PcodeOp,HighFunctionDBUtil
 #from ghidra.program.database.function import FunctionManager
-from ghidra.app.cmd.function import CreateFunctionCmd 
+from ghidra.app.cmd.function import CreateFunctionCmd
+from  generic.continues import RethrowContinuesFactory
+from  ghidra.app.script import GhidraScript
+from  ghidra.app.util.bin import ByteProvider
+from  ghidra.app.util.bin import RandomAccessByteProvider
+from  ghidra.app.util.bin import BinaryReader
+from  ghidra.app.util.bin.format.macho import MachHeader
+from  ghidra.app.util.bin.format.macho import Section
+from  ghidra.app.util.bin.format.macho import commands
+from  ghidra.program.model.address import Address
+from ghidra.program.model.address import AddressRangeImpl
+
+from  java.io import File
+from  java.io import ByteArrayInputStream;
+import struct
+
 import os,logging
 from __main__ import *
+
+def handle_tagged_pointer(ptr_addr,raw_ptr,className=None):
+    func = getFunctionContaining(raw_ptr)
+    if func == None:
+        print("function is None at 0x%s 0x%s" %(ptr_addr,raw_ptr))
+        func = createFunction(raw_ptr,className)
+
+    currentProgram.getReferenceManager().removeAllReferencesFrom(ptr_addr)
+    ref = currentProgram.getReferenceManager().addMemoryReference(ptr_addr,func.getEntryPoint(),
+                                                                  RefType.COMPUTED_CALL,SourceType.USER_DEFINED,0)
+    currentProgram.getReferenceManager().setPrimary(ref,True)
+
+    return func
+
+def get_datatype_manager_by_name(name):
+    tool = state.getTool()
+    service = tool.getService(DataTypeManagerService)
+    dataTypeManagers = service.getDataTypeManagers();
+
+    for manager in dataTypeManagers:
+        if manager.name == name:
+            return manager
+
+    return None
+
+def get_shared_dt_mgr(name):
+        tool = state.getTool()
+        service = tool.getService(DataTypeManagerService)
+        dataTypeManagers = service.getDataTypeManagers();
+
+        for manager in dataTypeManagers:
+            if manager.name == name:
+                return manager
+
+        return None
 
 def get_decompiler():
     ifc = DecompInterface()
@@ -44,16 +94,34 @@ def decompile_func(ifc,func):
         raise Exception("Cannot get HighFunction")
     return hfunc
 
+def debug_clangLine(lines,linum):
+    for line in lines:
+        if line.getLineNumber() != linum:
+            continue
+
+        print (line)
+        tokens = line.getAllTokens()
+        for token in tokens:
+            print token, type(token),"opcode :", token.getPcodeOp()
+
 def addTypeDef(name,nametype):
+    isPtr = False
     dtm = currentProgram.getDataTypeManager()
-    aType = find_dt(nametype) 
-    #aType = dtm.getDataType("/"+nametype)
+    if "*" in nametype:
+        nametype = nametype.replace("*","")
+        isPtr = True
+
+    aType = find_dt(nametype)
     if aType == None:
         return
     category = aType.getCategoryPath()
-    newtype = TypedefDataType(category,name,aType,dtm)
+    if isPtr:
+        newtype = TypedefDataType(category,name,PointerDataType(aType),dtm)
+    else:
+        newtype = TypedefDataType(category,name,aType,dtm)
+
     dtm.addDataType(newtype,None)
-    
+
 def DeclareDataTypes():
     addTypeDef("IOOptionBits","uint")
     addTypeDef("UInt32","uint")
@@ -61,8 +129,8 @@ def DeclareDataTypes():
     addTypeDef("IODirection","ulonglong")
     addTypeDef("IOVirtualAddress","ulonglong")
     addTypeDef("IOByteCount","ulonglong")
-    addTypeDef("task","pointer64")
-    addTypeDef("task","pointer")
+    #addTypeDef("task","pointer64")
+    addTypeDef("task","void")
     addTypeDef("OSMetaClassBase","ulonglong")
     addTypeDef("DestinationOrSource","uint")
     addTypeDef("socVersion","uint")
@@ -86,9 +154,14 @@ def DeclareDataTypes():
     addTypeDef("u64","ulonglong")
     addTypeDef("ipc_port","ulonglong")
     addTypeDef("IOExternalMethodDispatch","void")
-    addTypeDef("u32","ulong")
-    
-# Better Load Them from old projects    
+    addTypeDef("u32","uint")
+    addTypeDef("IOReturn","uint")
+
+def get_symbols_of(name):
+    mgr = currentProgram.getSymbolTable()
+    return mgr.getSymbols(name)
+
+# Better Load Them from old projects
 def defineIOExternalMethodArguments():
 
     dtm = currentProgram.getDataTypeManager()
@@ -101,13 +174,13 @@ def defineIOExternalMethodArguments():
     if dt == None:
         dt = StructureDataType("IOExternalMethodArguments",0)
         new = dt
-        
+    """
     elif dt.getLength() > 1:
         yes = askYesNo("IOExternalMethodArguments",
                     "[-] Looks like IOExternalMethodArguments is already defined, continue ?")
         if yes == False:
             exit()
-
+    """
     uint = dtm.getDataType("/uint")
     ulonglong= dtm.getDataType("/ulonglong")
 
@@ -118,12 +191,12 @@ def defineIOExternalMethodArguments():
     st.add(ulonglong,"asyncWakePort","")
     st.add(PointerDataType(uint),"asyncReference","")
     st.add(uint,"asyncReferenceCount","")
-    
+
     st.add(PointerDataType(ulonglong),"scalarInput","")
     st.add(uint,"scalarInputCount","")
     st.add(PointerDataType(ulonglong),"structureInput","")
     st.add(uint,"structureInputSize","")
-    
+
     st.add(PointerDataType(IOMemoryDescriptor),"StructureInputDescriptor","")
 
     st.add(PointerDataType(ulonglong),"scalarOutput","")
@@ -137,7 +210,7 @@ def defineIOExternalMethodArguments():
 
     st.add(uint,"__reservedA","")
     st.add(PointerDataType(ulonglong),"structureVariableOutputData","")
-    st.setPackingEnabled(True)
+    #st.setInternallyAligned(True)
     if new :
         dtm.addDataType(new,None)
         dtm.addDataType(PointerDataType(new),None)
@@ -146,17 +219,19 @@ def defineIOExternalTrap():
     dtm = currentProgram.getDataTypeManager()
     dt = dtm.findDataType(currentProgram.getName()+ "/"+"IOExternalTrap")
 
-        
+
     uint = dtm.getDataType("/uint")
     IOService = dtm.getDataType("/IOService")
     IOTrap_def = "IOService::IOTrap(void * p1, void * p2, void * p3, void * p4, void * p5, void * p6)"
-  
+
     fdef = FunctionDefinitionDataType(IOTrap_def)
     fdef.setReturnType(uint)
     fdef.setGenericCallingConvention(GenericCallingConvention.thiscall)
-    
+
     st = StructureDataType("IOExternalTrap", 0)
-    st.setToMachineAligned()
+    #st.setToMachineAlignment()
+    st.setExplicitPackingValue(8)
+    st.setExplicitPackingValue(8)
     st.add(PointerDataType(IOService),"object","")
     st.add(PointerDataType(fdef),"func","")
 
@@ -165,7 +240,7 @@ def defineIOExternalTrap():
 def defineIOExternalMethod():
     dtm = currentProgram.getDataTypeManager()
     dt = dtm.findDataType(currentProgram.getName()+ "/"+"IOExternalMethod")
-    
+
     IOService = dtm.getDataType("/IOService")
     IOMethod_def = "uint IOService::IOMethod(void * p1, void * p2, void * p3, void * p4, void * p5, void * p6)"
     uint = dtm.getDataType("/uint")
@@ -173,8 +248,9 @@ def defineIOExternalMethod():
 
     fdef = parseCSignature(IOMethod_def)
     st = StructureDataType("IOExternalMethod", 0)
-    
-    st.setToMachineAligned()
+
+    # st.setToMachineAlignment()
+    st.setExplicitPackingValue(8)
     st.add(PointerDataType(IOService),"object","")
     st.add(PointerDataType(fdef),"func","")
     st.add(uint,"flags","")
@@ -186,16 +262,16 @@ def defineIOExternalMethod():
 def defineIOExternalAsyncMethod():
     dtm = currentProgram.getDataTypeManager()
     dt = dtm.findDataType(currentProgram.getName()+ "/"+"IOExternalAsyncMethod")
-    
+
     IOService = dtm.getDataType("/IOService")
     IOAsyncMethod_def = "uint IOService::IOAsyncMethod(uint asyncRef[8], void * p1, void * p2, void * p3, void * p4, void * p5, void * p6)"
-    
+
     uint = dtm.getDataType("/uint")
     ulonglong= dtm.getDataType("/ulonglong")
     fdef = parseCSignature(IOAsyncMethod_def)
     st = StructureDataType("IOExternalAsyncMethod", 0)
-    #BUG: Work with alignement
-    st.setToMachineAligned()
+
+    st.setExplicitPackingValue(8)
     st.add(PointerDataType(IOService),"object","")
     st.add(PointerDataType(fdef),"func","")
     st.add(uint,"flags","")
@@ -207,27 +283,18 @@ def defineIOExternalAsyncMethod():
 def fixLabel(data):
     name = getSymbolAt(data).getName()
     labelAddress = getSymbolAt(data).getAddress()
-    #print labelAddress, name
     # ghidra refers to some functions as data, I've seen only one case
-    if ("LAB_" not in name):
-        currentProgram.getListing().clearCodeUnits(data,data.add(8),False)
-        name = name.split("_")[1]
-        ret = createFunction(labelAddress,"LAB_"+name)
-        
     labelName = name.replace("LAB_","FUN_")
-    #print disassemble(labelAddress)
     if disassemble(labelAddress) == False:
         popup("This Label "+ labelAddress + "cannot be disassembled !")
         return -1
-    #print "labelName:",labelName
     ret = createFunction(labelAddress,labelName)
     func = getFunctionAt(labelAddress)
     if func == None:
         # Calling CreateFunction twice will force function creation
-        # Don't ask me,ask NSA 
+        # Don't ask me,ask NSA
         ret = createFunction(labelAddress,labelName)
-        
-    # why it sometimes returns None ? last chance
+
     func = getFunctionAt(labelAddress)
     if(func == None):
         listing = currentProgram.getListing()
@@ -237,31 +304,17 @@ def fixLabel(data):
         l = labelAddress
         currentProgram.getListing().clearCodeUnits(l,l.add(8),True)
         createFunction(labelAddress,"FUN_"+name)
-        
-        #x = getFunctionAt(labelAddress)
-        #print cbIter
-        #x = CreateFunctionCmd(labelAddress,False)
-        #print type(x)
-        #funcBody =  x.getFunctionBody(currentProgram,labelAddress)
-        #print funcBody
-        #mgr = currentProgram.getFunctionManager()
-        #mgr.createFunction("test",labelAddress,funcBody,SourceType.USER_DEFINED)
-        #raise Exception("Unable to create a function 0x%s" %(labelAddress.toString()))
-        #x = ApplyFunctionSignatureCmd(labelName)
-        #print x
-
-        #return
 
     func = getFunctionAt(labelAddress)
-    assert(func != None)
+    if(func == None):
+        return
     func.setCustomVariableStorage(False)
-    #params = func.getParameters()
     df = FunctionDefinitionDataType(func,False)
-    
-    # TODO : remove the below line , no need to change calling convention 
+
+    # TODO : remove the below line , no need to change calling convention
     #df.setGenericCallingConvention(GenericCallingConvention.thiscall)
     df.setReturnType(func.getReturnType())
-    
+
     #df = FunctionDefinitionDataType(func,False)
     """
     func.replaceParameters(FunctionUpdateType.DYNAMIC_STORAGE_ALL_PARAMS,#CUSTOM_STORAGE,
@@ -271,7 +324,8 @@ def fixLabel(data):
     """
     x = ApplyFunctionSignatureCmd(func.getEntryPoint(),df,SourceType.USER_DEFINED)
     x.applyTo(func.getProgram())
-    
+    return func
+
 def defineLabel(symtab,namespace,addr,methodName):
     sym = getSymbolAt(addr)
     if sym == None:
@@ -287,7 +341,6 @@ def makePTR(addr):
     currentProgram.getListing().createData(addr, PTR)
 
 def makeUint(addr,comment):
-    #addr = toAddr(addr)
     uint_dt = currentProgram.getDataTypeManager().getDataType("/uint")
     currentProgram.getListing().createData(addr, uint_dt)
     #setEOLComment(addr,comment)
@@ -297,7 +350,7 @@ def makeULongLong(addr,comment= None):
     #uint_dt = currentProgram.getDataTypeManager().getDataType("/ulonglong")
     uint_dt = currentProgram.getDataTypeManager().getDataType("/qword")
     currentProgram.getListing().createData(addr, uint_dt)
-    
+
 
 def prepareClassName(className,classSize):
     locs = ["/","/Demangler/"]
@@ -305,58 +358,45 @@ def prepareClassName(className,classSize):
         res = findDataTypeByName(location+className)
         if res:
             return
-    
+
     class_struct = StructureDataType(className,0)
     currentProgram.getDataTypeManager().addDataType(class_struct,None)
 
 
-'''
-def parseCSignature(text):
-    tool = state.getTool()
-    service = tool.getService(DataTypeManagerService)
-    dtm = currentProgram.getDataTypeManager()
-
-    df =parseSignature(service,currentProgram,text)
-    df.setGenericCallingConvention(GenericCallingConvention.thiscall)
-    
-    #dtm.addDataType(PointerDataType(df),None)
-    return df
-'''
 def parseCSignature(text):
     tool = state.getTool()
     service = tool.getService(DataTypeManagerService)
     dtm = currentProgram.getDataTypeManager()
     df = None
-    
+
     try:
         df =parseSignature(service,currentProgram,text,False)
     except ghidra.app.util.cparser.C.ParseException as e:
-        # Loosy workaround , i will get back to it later 
+        # Loosy workaround , i will get back to it later
         off = text.find("(")
         logger.warnign("[!] Please fix the definition of %s" % (text))
         text = text[:off]+"()"
 
         df = parseSignature(service,currentProgram,text,True)
 
-    
+
     if df == None:
         return None
     df.setGenericCallingConvention(GenericCallingConvention.thiscall)
-    
+
     #dtm.addDataType(PointerDataType(df),None)
     return df
-#'''
 
 def findDataTypeByName(name):
     tool = state.getTool()
     service = tool.getService(DataTypeManagerService)
     dataTypeManagers = service.getDataTypeManagers();
-    
+
     for manager in dataTypeManagers:
         dataType = manager.getDataType(name)
         if dataType :
             return dataType
-    
+
     return None
 
 def find_struct(name):
@@ -368,7 +408,7 @@ def find_dt(name):
         dt = findDataTypeByName(location+name)
         if dt:
             return dt
-                
+
     return None
 
 def find_funcdef(name):
@@ -377,28 +417,28 @@ def find_funcdef(name):
     return findDataTypeByName("/"+name)
 
 
+# Defines some mandatory class structures for the kernelcache
 def prepare():
     DeclareDataTypes()
     defineIOExternalMethodArguments()
     defineIOExternalTrap()
     defineIOExternalMethod()
     defineIOExternalAsyncMethod()
-    
+    #currentProgram.getDataTypeManager().endTransaction(tid)
 
-def setup_logging(name):
-    #symbolTable = currentProgram.getSymbolTable() 
-    logging.basicConfig(filename='/tmp/debug.log',level=logging.DEBUG)
-    
+def setup_logging(name,level=logging.DEBUG):
+    #symbolTable = currentProgram.getSymbolTable()
+    #logging.basicConfig(filename='/tmp/debug.log',level=level)
+
     log = logging.getLogger(name)
-    log.setLevel(logging.INFO)
-    
+    log.setLevel(level)
+
     ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
+    ch.setLevel(level)
     #formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s: %(message)s')
     formatter = logging.Formatter('%(levelname)s: %(message)s')
     ch.setFormatter(formatter)
-    
+
     log.addHandler(ch)
 
     return log
-

@@ -6,3 +6,15 @@ OSSymbol * existingSymbolForCString(char *aCString);
 virtual bool initWithCString( char *cString);
 virtual bool initWithCStringNoCopy(char *cString);
 virtual bool initWithString(OSString *aString);
+virtual bool isEqualTo(const OSMetaClassBase * anObject);
+virtual void free();
+virtual unsigned int getLength(void);
+virtual bool isEqualTo_1(const OSString * aString);
+virtual bool isEqualTo_2(const char * cString);
+virtual bool isEqualTo_4(const OSSymbol * aSymbol);
+virtual char getChar(unsigned int index);
+virtual bool setChar(char aChar, unsigned int index);
+virtual void taggedRelease_1(const void * tag,const int    freeWhen);
+virtual void taggedRelease(const void * tag);
+virtual const OSMetaClass * getMetaClass();
+
