@@ -222,7 +222,7 @@ if __name__ == "__main__":
 ## Miscellaneous scripts
 ---
 ### Importing KDK's Dwarf4 
-Ghidra somehow fails to load the corresponding `.dsym` directory, I made a small script to fix this. It can be found [here](https://github.com/0x36/ghidra_kernelcache/dwarf4_fix.py).
+Ghidra somehow fails to load the corresponding `.dsym` directory, I made a small script to fix this. It can be found [here](https://github.com/0x36/ghidra_kernelcache/blob/master/dwarf4_fix.py).
 **Usage** : load the kernel from your KDK path, let Ghidra finishes the analysis, then run `dwarf_fix.py`, it will load the symbols and the process may take several minutes.
 <img src="https://github.com/0x36/ghidra_kernelcache/blob/master/screenshots/image12.png" alt="image12"/>
 
