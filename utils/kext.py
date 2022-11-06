@@ -41,7 +41,7 @@ class Kext(kernelCache):
         self.read32 = lambda off: struct.unpack("<I",self.br.readByteArray(off,4))[0]
         self.image_base = currentProgram.getImageBase()
         self.provider = RandomAccessByteProvider(f)
-        self.header = MachHeader.createMachHeader( RethrowContinuesFactory.INSTANCE, self.provider )
+        self.header = MachHeader(self.provider)
         self.header.parse()
         self.br = BinaryReader(self.provider,True)
 
