@@ -14,7 +14,6 @@ from ghidra.program.model.listing.Function import FunctionUpdateType
 from ghidra.program.model.pcode import PcodeOp,HighFunctionDBUtil
 #from ghidra.program.database.function import FunctionManager
 from ghidra.app.cmd.function import CreateFunctionCmd
-from  generic.continues import RethrowContinuesFactory
 from  ghidra.app.script import GhidraScript
 from  ghidra.app.util.bin import ByteProvider
 from  ghidra.app.util.bin import RandomAccessByteProvider
